@@ -13,7 +13,8 @@ paper_authors = Table(
     Base.metadata,
     Column("paper_id", Integer, ForeignKey("papers.paper_id"), primary_key=True),
     Column("author_id", Integer, ForeignKey("authors.author_id"), primary_key=True),
-    Column("author_order", Integer, default=0)
+    Column("author_order", Integer, default=0),
+    Column("is_corresponding", Boolean, default=False),
 )
 
 
@@ -32,7 +33,9 @@ class Paper(Base):
     title = Column(String, nullable=False, index=True)
     abstract = Column(Text)
     year = Column(Integer, index=True)
+    venue_id = Column(Integer, ForeignKey("venues.venue_id"))
     venue = Column(String)
+    paper_type = Column(String, default="article")
     doi = Column(String)
     arxiv_id = Column(String)
     url = Column(String)
@@ -43,6 +46,26 @@ class Paper(Base):
     authors = relationship("Author", secondary=paper_authors, back_populates="papers")
     tags = relationship("Tag", secondary=paper_tags, back_populates="papers")
     notes = relationship("Note", back_populates="paper")
+    venue_ref = relationship("Venue", back_populates="papers")
+    attachments = relationship(
+        "Attachment", back_populates="paper", cascade="all, delete-orphan"
+    )
+    bibtex_entries = relationship(
+        "BibtexEntry", back_populates="paper", cascade="all, delete-orphan"
+    )
+    collections = relationship(
+        "Collection", secondary="collection_papers", back_populates="papers"
+    )
+
+
+class Venue(Base):
+    __tablename__ = "venues"
+
+    venue_id = Column(Integer, primary_key=True, index=True)
+    venue_name = Column(String, nullable=False, unique=True)
+    venue_type = Column(String, default="conference")
+
+    papers = relationship("Paper", back_populates="venue_ref")
 
 
 class Author(Base):
@@ -63,6 +86,59 @@ class Tag(Base):
     color = Column(String)
 
     papers = relationship("Paper", secondary=paper_tags, back_populates="tags")
+
+
+collection_papers = Table(
+    "collection_papers",
+    Base.metadata,
+    Column(
+        "collection_id",
+        Integer,
+        ForeignKey("collections.collection_id"),
+        primary_key=True,
+    ),
+    Column("paper_id", Integer, ForeignKey("papers.paper_id"), primary_key=True),
+)
+
+
+class Collection(Base):
+    __tablename__ = "collections"
+
+    collection_id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, nullable=True)
+    collection_name = Column(String, nullable=False)
+    parent_id = Column(Integer, ForeignKey("collections.collection_id"))
+
+    parent = relationship("Collection", remote_side=[collection_id])
+    papers = relationship(
+        "Paper", secondary=collection_papers, back_populates="collections"
+    )
+
+
+class Attachment(Base):
+    __tablename__ = "attachments"
+
+    attachment_id = Column(Integer, primary_key=True, index=True)
+    paper_id = Column(Integer, ForeignKey("papers.paper_id"), nullable=False)
+    file_name = Column(String, nullable=False)
+    file_path = Column(String, nullable=False)
+    file_type = Column(String)
+    uploaded_by = Column(Integer, nullable=True)
+    uploaded_at = Column(DateTime, server_default=func.now())
+
+    paper = relationship("Paper", back_populates="attachments")
+
+
+class BibtexEntry(Base):
+    __tablename__ = "bibtex_entries"
+
+    bibtex_id = Column(Integer, primary_key=True, index=True)
+    paper_id = Column(Integer, ForeignKey("papers.paper_id"), nullable=False)
+    bibtex_key = Column(String)
+    raw_bibtex = Column(Text, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+    paper = relationship("Paper", back_populates="bibtex_entries")
 
 
 class Note(Base):

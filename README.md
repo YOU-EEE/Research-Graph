@@ -57,7 +57,13 @@ research-graph/
 ```
 
 目前只完成了一个最初步的可以添加/删除/更改paper id的后端api，测试：
+开启后端：
 ``` bash
 cd backend
 uvicorn main:app --reload 
+```
+接着开启前端：
+```bash
+cd frontend
+npm run dev
 ```
