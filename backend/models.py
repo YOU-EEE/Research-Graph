@@ -1,6 +1,6 @@
 from sqlalchemy import (
     Column, Integer, String, Text, DateTime, ForeignKey,
-    Table, Float, Boolean
+    Table, Float, Boolean, LargeBinary
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -202,6 +202,19 @@ class AITagSuggestion(Base):
     created_at = Column(DateTime, server_default=func.now())
 
 
+class AIRelationSuggestion(Base):
+    __tablename__ = "ai_relation_suggestions"
+
+    suggestion_id = Column(Integer, primary_key=True, index=True)
+    source_paper_id = Column(Integer, ForeignKey("papers.paper_id"))
+    target_paper_id = Column(Integer, ForeignKey("papers.paper_id"))
+    relation_type = Column(String, nullable=False)
+    confidence = Column(Float)
+    reason = Column(Text)
+    is_accepted = Column(Boolean, default=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+
 class PaperSimilarity(Base):
     __tablename__ = "paper_similarity"
 
@@ -210,3 +223,45 @@ class PaperSimilarity(Base):
     similarity_score = Column(Float, nullable=False)
     method = Column(String, default="tfidf_cosine")
     created_at = Column(DateTime, server_default=func.now())
+
+
+# ---------- 成员 C：AI 主题聚类 / 嵌入缓存 ----------
+class ResearchCluster(Base):
+    """Related Work 研究主题聚类（一次聚类生成多条）。"""
+    __tablename__ = "research_clusters"
+
+    cluster_id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, nullable=True)   # 可选：按项目过滤；None 表示全库聚类
+    label = Column(String, nullable=False)
+    description = Column(Text)
+    method = Column(String, default="kmeans")
+    num_papers = Column(Integer, default=0)
+    created_at = Column(DateTime, server_default=func.now())
+
+    members = relationship(
+        "ClusterPaper", back_populates="cluster", cascade="all, delete-orphan"
+    )
+
+
+class ClusterPaper(Base):
+    """聚类与论文的多对多 + 隶属度。"""
+    __tablename__ = "cluster_papers"
+
+    cluster_id = Column(
+        Integer, ForeignKey("research_clusters.cluster_id"), primary_key=True
+    )
+    paper_id = Column(Integer, ForeignKey("papers.paper_id"), primary_key=True)
+    membership_score = Column(Float, default=1.0)
+
+    cluster = relationship("ResearchCluster", back_populates="members")
+
+
+class PaperEmbedding(Base):
+    """论文向量缓存，供相似度 / 聚类复用（BLOB 存 float32）。"""
+    __tablename__ = "paper_embeddings"
+
+    paper_id = Column(Integer, ForeignKey("papers.paper_id"), primary_key=True)
+    vector = Column(LargeBinary, nullable=False)
+    dim = Column(Integer, nullable=False)
+    model = Column(String)
+    computed_at = Column(DateTime, server_default=func.now())

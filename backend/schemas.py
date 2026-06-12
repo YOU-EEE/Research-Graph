@@ -170,3 +170,54 @@ class TagSuggestionOut(BaseModel):
     confidence: Optional[float]
     reason: Optional[str]
     is_accepted: bool
+
+
+# ---------- AI 分析模块（成员 C） ----------
+class SimilarPaperOut(BaseModel):
+    """相似论文一行（含目标论文标题，便于前端直接展示）。"""
+    target_paper_id: int
+    title: str
+    year: Optional[int] = None
+    similarity_score: float
+    method: str
+
+
+class RelationSuggestionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    suggestion_id: int
+    source_paper_id: int
+    target_paper_id: int
+    relation_type: str
+    confidence: Optional[float] = None
+    reason: Optional[str] = None
+    is_accepted: bool = False
+    target_title: Optional[str] = None
+
+
+class ClusterPaperOut(BaseModel):
+    paper_id: int
+    title: str
+    membership_score: float
+
+
+class ClusterOut(BaseModel):
+    cluster_id: int
+    label: str
+    description: Optional[str] = None
+    method: str
+    num_papers: int
+    papers: List[ClusterPaperOut] = Field(default_factory=list)
+
+
+class ClusterRequest(BaseModel):
+    """POST /api/ai/clusters 请求体。"""
+    project_id: Optional[int] = None
+    num_clusters: Optional[int] = None
+    mode: Optional[str] = None      # local | cloud；缺省走环境变量 AI_MODE
+
+
+class AcceptResult(BaseModel):
+    message: str
+    suggestion_id: int
+    created_id: Optional[int] = None   # 新建的 tag_id / relation_id

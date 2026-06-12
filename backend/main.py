@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import papers
+from routers import papers, ai
 from database import Base, engine, init_sqlite_schema
 
 Base.metadata.create_all(bind=engine)
@@ -26,7 +26,7 @@ app.include_router(
 )
 app.include_router(papers.import_router, prefix="/api/import", tags=["import"])
 # app.include_router(notes.router, prefix="/api/notes", tags=["notes"])
-# app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
+app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
 # app.include_router(graph.router, prefix="/api/graph", tags=["graph"])
 # app.include_router(tasks.router, prefix="/api/tasks", tags=["tasks"])
 
