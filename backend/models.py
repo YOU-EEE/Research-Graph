@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    Column, Integer, String, Text, DateTime, ForeignKey,
+    Column, Integer, String, Text, DateTime, ForeignKey, Date,
     Table, Float, Boolean, LargeBinary
 )
 from sqlalchemy.orm import relationship
@@ -265,3 +265,138 @@ class PaperEmbedding(Base):
     dim = Column(Integer, nullable=False)
     model = Column(String)
     computed_at = Column(DateTime, server_default=func.now())
+
+
+# ============================================================
+# 模块 D：科研协作与知识图谱可视化模块
+# ============================================================
+
+# ---------- 笔记双链表 ----------
+note_links = Table(
+    "note_links",
+    Base.metadata,
+    Column("source_note_id", Integer, ForeignKey("notes.note_id"), primary_key=True),
+    Column("target_note_id", Integer, ForeignKey("notes.note_id"), primary_key=True),
+    Column("link_type", String, default="manual"),
+    Column("confidence", Float, default=1.0),
+)
+
+
+# ---------- 用户表 ----------
+class User(Base):
+    __tablename__ = "users"
+
+    user_id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, nullable=False, unique=True)
+    password_hash = Column(String, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+    projects_owned = relationship(
+        "Project", back_populates="owner", foreign_keys="Project.owner_id"
+    )
+    task_assignments = relationship(
+        "TaskAssignment", back_populates="user", cascade="all, delete-orphan"
+    )
+    comments = relationship(
+        "Comment", back_populates="user", cascade="all, delete-orphan"
+    )
+    activity_logs = relationship(
+        "ActivityLog", back_populates="user", cascade="all, delete-orphan"
+    )
+
+
+# ---------- 项目表 ----------
+class Project(Base):
+    __tablename__ = "projects"
+
+    project_id = Column(Integer, primary_key=True, index=True)
+    project_name = Column(String, nullable=False)
+    description = Column(Text)
+    owner_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+    owner = relationship(
+        "User", back_populates="projects_owned", foreign_keys=[owner_id]
+    )
+    members = relationship(
+        "ProjectMember", back_populates="project", cascade="all, delete-orphan"
+    )
+    reading_tasks = relationship(
+        "ReadingTask", back_populates="project", cascade="all, delete-orphan"
+    )
+
+
+# ---------- 项目成员表 ----------
+class ProjectMember(Base):
+    __tablename__ = "project_members"
+
+    project_id = Column(Integer, ForeignKey("projects.project_id"), primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.user_id"), primary_key=True)
+    role = Column(String, nullable=False, default="member")
+    joined_at = Column(DateTime, server_default=func.now())
+
+    project = relationship("Project", back_populates="members")
+    user_info = relationship("User")
+
+
+# ---------- 阅读任务表 ----------
+class ReadingTask(Base):
+    __tablename__ = "reading_tasks"
+
+    task_id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.project_id"), nullable=False)
+    paper_id = Column(Integer, ForeignKey("papers.paper_id"), nullable=False)
+    assigned_by = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    title = Column(String, nullable=False)
+    task_description = Column(Text)
+    deadline = Column(Date)
+    created_at = Column(DateTime, server_default=func.now())
+
+    project = relationship("Project", back_populates="reading_tasks")
+    paper = relationship("Paper")
+    assigner = relationship("User", foreign_keys=[assigned_by])
+    assignments = relationship(
+        "TaskAssignment", back_populates="task", cascade="all, delete-orphan"
+    )
+
+
+# ---------- 任务分配表 ----------
+class TaskAssignment(Base):
+    __tablename__ = "task_assignments"
+
+    task_id = Column(Integer, ForeignKey("reading_tasks.task_id"), primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.user_id"), primary_key=True)
+    status = Column(String, default="todo")
+    finished_at = Column(DateTime)
+
+    task = relationship("ReadingTask", back_populates="assignments")
+    user = relationship("User", back_populates="task_assignments")
+
+
+# ---------- 评论表 ----------
+class Comment(Base):
+    __tablename__ = "comments"
+
+    comment_id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    target_type = Column(String, nullable=False)
+    target_id = Column(Integer, nullable=False)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+    user = relationship("User", back_populates="comments")
+
+
+# ---------- 活动日志表 ----------
+class ActivityLog(Base):
+    __tablename__ = "activity_logs"
+
+    log_id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.user_id"))
+    action_type = Column(String, nullable=False)
+    target_type = Column(String)
+    target_id = Column(Integer)
+    description = Column(Text)
+    created_at = Column(DateTime, server_default=func.now())
+
+    user = relationship("User", back_populates="activity_logs")
