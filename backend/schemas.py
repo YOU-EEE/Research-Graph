@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional, List
+from typing import Optional, List, Any
 
 
 class PaperBase(BaseModel):
@@ -221,3 +221,175 @@ class AcceptResult(BaseModel):
     message: str
     suggestion_id: int
     created_id: Optional[int] = None   # 新建的 tag_id / relation_id
+
+
+# ============================================================
+# 模块 D：科研协作与知识图谱可视化模块
+# ============================================================
+
+# ---------- 用户 ----------
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+
+
+class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    user_id: int
+    username: str
+    created_at: Any = None
+
+
+# ---------- 项目 ----------
+class ProjectCreate(BaseModel):
+    project_name: str
+    description: Optional[str] = None
+
+
+class ProjectUpdate(BaseModel):
+    project_name: Optional[str] = None
+    description: Optional[str] = None
+
+
+class ProjectOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    project_id: int
+    project_name: str
+    description: Optional[str] = None
+    owner_id: int
+    created_at: Any = None
+
+
+class ProjectDetailOut(ProjectOut):
+    member_count: int = 0
+    paper_count: int = 0
+    task_count: int = 0
+
+
+# ---------- 项目成员 ----------
+class MemberAdd(BaseModel):
+    user_id: int
+    role: str = "member"  # admin, member, viewer
+
+
+class MemberUpdate(BaseModel):
+    role: str
+
+
+class MemberOut(BaseModel):
+    user_id: int
+    username: str = ""
+    role: str
+    joined_at: Any = None
+
+
+# ---------- 阅读任务 ----------
+class TaskCreate(BaseModel):
+    project_id: int
+    paper_id: int
+    title: str
+    task_description: Optional[str] = None
+    deadline: Optional[str] = None  # YYYY-MM-DD
+    assignee_ids: List[int] = Field(default_factory=list)
+
+
+class TaskUpdate(BaseModel):
+    title: Optional[str] = None
+    task_description: Optional[str] = None
+    deadline: Optional[str] = None
+    assignee_ids: Optional[List[int]] = None
+
+
+class TaskStatusUpdate(BaseModel):
+    status: str  # todo, reading, done, reported
+
+
+class TaskOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    task_id: int
+    project_id: int
+    paper_id: int
+    assigned_by: int
+    title: str
+    task_description: Optional[str] = None
+    deadline: Any = None
+    created_at: Any = None
+
+
+class TaskDetailOut(TaskOut):
+    paper_title: str = ""
+    assigner_name: str = ""
+    assignees: List[MemberOut] = Field(default_factory=list)
+
+
+# ---------- 评论 ----------
+class CommentCreate(BaseModel):
+    target_type: str  # paper, note, task
+    target_id: int
+    content: str
+
+
+class CommentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    comment_id: int
+    user_id: int
+    username: str = ""
+    target_type: str
+    target_id: int
+    content: str
+    created_at: Any = None
+
+
+# ---------- 活动日志 ----------
+class ActivityLogOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    log_id: int
+    user_id: Optional[int] = None
+    username: str = ""
+    action_type: str
+    target_type: Optional[str] = None
+    target_id: Optional[int] = None
+    description: Optional[str] = None
+    created_at: Any = None
+
+
+# ---------- 知识图谱 ----------
+class GraphNode(BaseModel):
+    id: str
+    label: str
+    type: str  # paper, author, venue, tag, concept, note, project
+    data: Optional[dict] = None
+
+
+class GraphEdge(BaseModel):
+    id: str
+    source: str
+    target: str
+    type: str   # authored_by, published_in, has_tag, has_note, etc.
+    weight: float = 1.0
+
+
+class GraphData(BaseModel):
+    nodes: List[GraphNode] = Field(default_factory=list)
+    edges: List[GraphEdge] = Field(default_factory=list)
+
+
+# ---------- Dashboard ----------
+class DashboardStats(BaseModel):
+    paper_count: int = 0
+    note_count: int = 0
+    project_count: int = 0
+    pending_task_count: int = 0
+    recent_papers: List[dict] = Field(default_factory=list)
+    recent_activities: List[ActivityLogOut] = Field(default_factory=list)
+    top_tags: List[dict] = Field(default_factory=list)
