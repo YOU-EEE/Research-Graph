@@ -14,7 +14,10 @@ from models import (
     Concept,
     Project,
     PaperRelation,
+    PaperSimilarity,
     NoteConcept,
+    ResearchCluster,
+    ClusterPaper,
     note_links,
     paper_authors,
     paper_tags,
@@ -300,6 +303,79 @@ def get_graph(
                             )
                         )
 
+    # --- 语义相似度边 (from paper_similarity) ---
+    if paper_ids_list:
+        sim_rows = (
+            db.query(PaperSimilarity)
+            .filter(
+                PaperSimilarity.source_paper_id.in_(paper_ids_list)
+                | PaperSimilarity.target_paper_id.in_(paper_ids_list)
+            )
+            .all()
+        )
+        for s in sim_rows:
+            if not edge_type or edge_type == "semantic_similar":
+                edges.append(
+                    GraphEdge(
+                        id=f"semantic_similar_{s.source_paper_id}_{s.target_paper_id}",
+                        source=f"paper_{s.source_paper_id}",
+                        target=f"paper_{s.target_paper_id}",
+                        type="semantic_similar",
+                        weight=float(s.similarity_score),
+                    )
+                )
+            # 确保两端论文节点被包含
+            for pid in (s.source_paper_id, s.target_paper_id):
+                if pid not in included_paper_ids:
+                    included_paper_ids.add(pid)
+                    p = db.query(Paper).filter(Paper.paper_id == pid).first()
+                    if p and (not node_type or node_type == "paper"):
+                        nodes.append(
+                            GraphNode(
+                                id=f"paper_{p.paper_id}",
+                                label=p.title,
+                                type="paper",
+                                data={"year": p.year},
+                            )
+                        )
+
+    # --- 研究主题聚类 (from research_clusters) ---
+    cluster_query = db.query(ResearchCluster)
+    if project_id is not None:
+        cluster_query = cluster_query.filter(
+            (ResearchCluster.project_id == project_id)
+            | (ResearchCluster.project_id.is_(None))
+        )
+    clusters = cluster_query.all()
+
+    for cluster in clusters:
+        if not node_type or node_type == "cluster":
+            nodes.append(
+                GraphNode(
+                    id=f"cluster_{cluster.cluster_id}",
+                    label=cluster.label,
+                    type="cluster",
+                    data={
+                        "description": cluster.description,
+                        "method": cluster.method,
+                        "num_papers": cluster.num_papers,
+                    },
+                )
+            )
+        # belongs_to edges
+        for cp in cluster.members:
+            if cp.paper_id in included_paper_ids or paper_id or not paper_ids_list:
+                if not edge_type or edge_type == "belongs_to":
+                    edges.append(
+                        GraphEdge(
+                            id=f"belongs_to_{cp.paper_id}_{cluster.cluster_id}",
+                            source=f"cluster_{cluster.cluster_id}",
+                            target=f"paper_{cp.paper_id}",
+                            type="belongs_to",
+                            weight=float(cp.membership_score),
+                        )
+                    )
+
     # --- 笔记间链接 ---
     note_ids_list = list(included_note_ids)
     if note_ids_list:
@@ -326,8 +402,7 @@ def get_graph(
     # --- 用户节点 ---
     for uid in included_user_ids:
         user = db.query(User).filter(User.user_id == uid).first()
-        if user and (not node_type or node_type == "project"):
-            # 将用户节点的 type 设为 "user"，但能出现在图谱中
+        if user and (not node_type or node_type == "user"):
             existing = any(n.id == f"user_{uid}" for n in nodes)
             if not existing:
                 nodes.append(
@@ -341,6 +416,9 @@ def get_graph(
     # --- 按 node_type 过滤 ---
     if node_type:
         nodes = [n for n in nodes if n.type == node_type]
+        # 同步清理孤儿边
+        node_ids = {n.id for n in nodes}
+        edges = [e for e in edges if e.source in node_ids and e.target in node_ids]
 
     # --- 按 edge_type 过滤 ---
     if edge_type:
