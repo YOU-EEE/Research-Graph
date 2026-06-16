@@ -8,6 +8,10 @@ import ProjectList from '../views/ProjectList.vue'
 import ProjectDashboard from '../views/ProjectDashboard.vue'
 import TaskList from '../views/TaskList.vue'
 import GraphView from '../views/GraphView.vue'
+import NoteList from '../views/NoteList.vue'
+import NoteEditor from '../views/NoteEditor.vue'
+import ConceptList from '../views/ConceptList.vue'
+import ConceptDetail from '../views/ConceptDetail.vue'
 
 const routes = [
   { path: '/login', name: 'login', component: Login, meta: { noAuth: true } },
@@ -19,6 +23,10 @@ const routes = [
   { path: '/projects/:id', name: 'project-dashboard', component: ProjectDashboard },
   { path: '/tasks', name: 'tasks', component: TaskList },
   { path: '/graph', name: 'graph', component: GraphView },
+  { path: '/notes', name: 'notes', component: NoteList },
+  { path: '/notes/:id', name: 'note-editor', component: NoteEditor, props: true },
+  { path: '/concepts', name: 'concepts', component: ConceptList },
+  { path: '/concepts/:id', name: 'concept-detail', component: ConceptDetail, props: true },
   { path: '/', redirect: '/dashboard' },
 ]
 

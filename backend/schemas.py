@@ -151,6 +151,13 @@ class NoteCreate(BaseModel):
     note_type: Optional[str] = "summary"
 
 
+class NoteUpdate(BaseModel):
+    paper_id: Optional[int] = None
+    title: Optional[str] = None
+    content: Optional[str] = None
+    note_type: Optional[str] = None
+
+
 class NoteOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -159,6 +166,48 @@ class NoteOut(BaseModel):
     title: str
     content: str
     note_type: Optional[str]
+    created_at: Any = None
+    updated_at: Any = None
+    paper_title: Optional[str] = None
+
+
+class ConceptCreate(BaseModel):
+    concept_name: str
+    description: Optional[str] = None
+
+
+class ConceptUpdate(BaseModel):
+    concept_name: Optional[str] = None
+    description: Optional[str] = None
+
+
+class ConceptOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    concept_id: int
+    concept_name: str
+    description: Optional[str] = None
+    created_at: Any = None
+    note_count: int = 0
+
+
+class NoteLinkOut(BaseModel):
+    note_id: int
+    title: str
+    paper_id: Optional[int] = None
+    paper_title: Optional[str] = None
+
+
+class NoteParseResult(BaseModel):
+    note_id: int
+    concepts: List[ConceptOut] = Field(default_factory=list)
+    linked_notes: List[NoteLinkOut] = Field(default_factory=list)
+
+
+class NoteBacklinksOut(BaseModel):
+    note_id: int
+    inbound_notes: List[NoteLinkOut] = Field(default_factory=list)
+    shared_concept_notes: List[NoteLinkOut] = Field(default_factory=list)
 
 
 class TagSuggestionOut(BaseModel):

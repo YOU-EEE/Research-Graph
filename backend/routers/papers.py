@@ -13,6 +13,7 @@ from models import (
     Author,
     BibtexEntry,
     Collection,
+    Note,
     Paper,
     Tag,
     Venue,
@@ -26,6 +27,7 @@ from schemas import (
     BibtexImportText,
     CollectionCreate,
     CollectionOut,
+    NoteOut,
     PaperCreate,
     PaperDetailOut,
     PaperOut,
@@ -663,6 +665,19 @@ def list_bibtex_entries(paper_id: int, db: Session = Depends(get_db)):
         db.query(BibtexEntry)
         .filter(BibtexEntry.paper_id == paper_id)
         .order_by(BibtexEntry.bibtex_id.desc())
+        .all()
+    )
+
+
+@router.get("/{paper_id}/notes", response_model=list[NoteOut])
+def list_paper_notes(paper_id: int, db: Session = Depends(get_db)):
+    paper = db.query(Paper).filter(Paper.paper_id == paper_id).first()
+    if not paper:
+        raise HTTPException(status_code=404, detail="Paper not found")
+    return (
+        db.query(Note)
+        .filter(Note.paper_id == paper_id)
+        .order_by(Note.updated_at.desc())
         .all()
     )
 
