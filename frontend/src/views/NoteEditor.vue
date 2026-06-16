@@ -129,14 +129,18 @@ onMounted(async () => {
 
 <template>
   <section v-loading="loading" class="page-section">
-    <div class="detail-toolbar">
+    <div class="note-toolbar">
       <el-button :icon="ArrowLeft" @click="router.push('/notes')">Back</el-button>
-      <div class="detail-actions">
-        <el-segmented v-model="previewMode" :options="[
-          { label: 'Split', value: 'split' },
-          { label: 'Edit', value: 'edit' },
-          { label: 'Preview', value: 'preview' },
-        ]" />
+      <div class="note-toolbar-actions">
+        <el-segmented
+          v-model="previewMode"
+          class="mode-switch"
+          :options="[
+            { label: 'Split', value: 'split' },
+            { label: 'Edit', value: 'edit' },
+            { label: 'Preview', value: 'preview' },
+          ]"
+        />
         <el-button :icon="Connection" :loading="parsing" @click="parseLinks">Parse Links</el-button>
         <el-button type="primary" :icon="Finished" :loading="saving" @click="saveNote">Save</el-button>
         <el-button type="danger" plain :icon="Delete" @click="confirmDelete">Delete</el-button>
@@ -149,7 +153,7 @@ onMounted(async () => {
           <div class="note-meta">
             <el-input v-model="form.title" class="note-title-input" placeholder="Note title" />
             <div class="note-meta-row">
-              <el-select v-model="form.paper_id" clearable filterable placeholder="Linked paper">
+              <el-select v-model="form.paper_id" clearable filterable placeholder="Linked paper" class="paper-select">
                 <el-option
                   v-for="paper in papers"
                   :key="paper.paper_id"
@@ -166,23 +170,34 @@ onMounted(async () => {
             </div>
           </div>
 
-          <div class="editor-grid" :class="`mode-${previewMode}`">
-            <el-input
-              v-if="previewMode !== 'preview'"
-              v-model="form.content"
-              type="textarea"
-              resize="none"
-              class="markdown-input"
-              placeholder="Use [[Concept Name]] to create concept links."
-            />
-            <div v-if="previewMode !== 'edit'" class="preview-pane">
-              <MdPreview :model-value="form.content" />
+          <div class="editor-card">
+            <div class="editor-grid" :class="`mode-${previewMode}`">
+              <section v-if="previewMode !== 'preview'" class="editor-pane">
+                <div class="pane-heading">
+                  <span>Markdown</span>
+                  <small>{{ form.content.length }} chars</small>
+                </div>
+                <el-input
+                  v-model="form.content"
+                  type="textarea"
+                  resize="none"
+                  class="markdown-input"
+                  placeholder="Use [[Concept Name]] to create concept links."
+                />
+              </section>
+              <section v-if="previewMode !== 'edit'" class="preview-pane">
+                <div class="pane-heading">
+                  <span>Preview</span>
+                  <small>{{ wikiLinks.length }} links</small>
+                </div>
+                <MdPreview :model-value="form.content" />
+              </section>
             </div>
           </div>
         </section>
 
         <aside class="note-side">
-          <el-card shadow="never">
+          <el-card shadow="never" class="side-card">
             <template #header>
               <span><el-icon><Connection /></el-icon> Concepts</span>
             </template>
@@ -208,7 +223,7 @@ onMounted(async () => {
             </div>
           </el-card>
 
-          <el-card shadow="never">
+          <el-card shadow="never" class="side-card">
             <template #header>
               <span><el-icon><Refresh /></el-icon> Backlinks</span>
             </template>
@@ -226,7 +241,7 @@ onMounted(async () => {
             </div>
           </el-card>
 
-          <el-card shadow="never">
+          <el-card shadow="never" class="side-card">
             <template #header>
               <span><el-icon><Document /></el-icon> Related Notes</span>
             </template>
@@ -258,11 +273,48 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.page-section {
+  gap: 14px;
+}
+
+.note-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid #dde3ec;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  padding: 10px 12px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+  backdrop-filter: blur(10px);
+}
+
+.note-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.mode-switch {
+  --el-segmented-item-selected-bg-color: var(--primary);
+  --el-segmented-item-selected-color: #fff;
+  --el-segmented-item-hover-bg-color: #eaf2ff;
+  min-width: 260px;
+}
+
 .note-shell {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 20px;
   align-items: start;
+  max-width: 1680px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .note-main,
@@ -273,38 +325,54 @@ onMounted(async () => {
 .note-side {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
+  position: sticky;
+  top: 88px;
 }
 
 .note-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 12px;
+  display: grid;
+  gap: 12px;
+  margin-bottom: 14px;
+  border: 1px solid #dde3ec;
+  border-radius: 8px;
+  background: #fff;
+  padding: 14px 16px;
 }
 
 .note-title-input :deep(.el-input__wrapper) {
-  padding: 6px 12px;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .note-title-input :deep(.el-input__inner) {
-  height: 38px;
-  font-size: 24px;
+  height: 46px;
+  color: #111827;
+  font-size: 30px;
   font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.2;
 }
 
 .note-meta-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 180px;
-  gap: 10px;
+  gap: 12px;
+}
+
+.editor-card {
+  border: 1px solid #dde3ec;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.04);
 }
 
 .editor-grid {
   display: grid;
-  min-height: calc(100vh - 250px);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  overflow: hidden;
+  min-height: calc(100vh - 290px);
   background: #fff;
 }
 
@@ -317,26 +385,102 @@ onMounted(async () => {
   grid-template-columns: 1fr;
 }
 
+.editor-pane,
+.preview-pane {
+  display: flex;
+  min-width: 0;
+  min-height: calc(100vh - 290px);
+  flex-direction: column;
+  background: #fff;
+}
+
+.pane-heading {
+  display: flex;
+  height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #edf0f5;
+  background: #f8fafc;
+  padding: 0 14px;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pane-heading small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.markdown-input {
+  flex: 1;
+}
+
 .markdown-input :deep(.el-textarea__inner) {
   height: 100%;
-  min-height: calc(100vh - 250px) !important;
+  min-height: calc(100vh - 332px) !important;
   border: 0;
   border-radius: 0;
   box-shadow: none;
   font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
   font-size: 14px;
-  line-height: 1.7;
+  line-height: 1.85;
+  padding: 18px 22px;
+  color: #334155;
+  background: #fcfdff;
 }
 
 .preview-pane {
-  min-width: 0;
   overflow: auto;
   border-left: 1px solid var(--line);
-  background: #fff;
 }
 
 .mode-preview .preview-pane {
   border-left: 0;
+}
+
+.preview-pane :deep(.md-editor-preview-wrapper) {
+  flex: 1;
+  padding: 20px 24px;
+}
+
+.preview-pane :deep(.md-editor-preview) {
+  color: #1f2937;
+  font-size: 16px;
+  line-height: 1.85;
+}
+
+.preview-pane :deep(.md-editor-preview p) {
+  margin: 0 0 14px;
+}
+
+.preview-pane :deep(.katex-display) {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 6px 0;
+}
+
+.side-card {
+  border-color: #dde3ec;
+  border-radius: 8px;
+}
+
+.side-card :deep(.el-card__header) {
+  padding: 12px 14px;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.side-card :deep(.el-card__header span) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.side-card :deep(.el-card__body) {
+  padding: 14px;
 }
 
 .side-list {
@@ -349,11 +493,11 @@ onMounted(async () => {
   display: flex;
   cursor: pointer;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: #f9fafb;
-  padding: 8px;
+  padding: 10px;
 }
 
 .side-link:hover {
@@ -377,6 +521,20 @@ onMounted(async () => {
   .editor-grid.mode-split,
   .note-meta-row {
     grid-template-columns: 1fr;
+  }
+
+  .note-toolbar,
+  .note-toolbar-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .mode-switch {
+    min-width: 0;
+  }
+
+  .note-side {
+    position: static;
   }
 
   .preview-pane {
