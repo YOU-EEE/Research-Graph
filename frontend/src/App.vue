@@ -3,7 +3,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { computed } from 'vue'
 import {
   Document, Notebook, UploadFilled, FolderOpened,
-  List, DataBoard, Connection, SwitchButton, HomeFilled,
+  List, Connection, SwitchButton, HomeFilled, CollectionTag,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -47,6 +47,14 @@ function handleLogout() {
           <el-icon><UploadFilled /></el-icon>
           <span>BibTeX 导入</span>
         </el-menu-item>
+        <el-menu-item index="/notes">
+          <el-icon><Notebook /></el-icon>
+          <span>阅读笔记</span>
+        </el-menu-item>
+        <el-menu-item index="/concepts">
+          <el-icon><CollectionTag /></el-icon>
+          <span>概念卡片</span>
+        </el-menu-item>
         <el-menu-item index="/projects">
           <el-icon><FolderOpened /></el-icon>
           <span>科研项目</span>
@@ -58,10 +66,6 @@ function handleLogout() {
         <el-menu-item index="/graph">
           <el-icon><Connection /></el-icon>
           <span>知识图谱</span>
-        </el-menu-item>
-        <el-menu-item index="/papers">
-          <el-icon><Notebook /></el-icon>
-          <span>AI 分析</span>
         </el-menu-item>
       </el-menu>
 

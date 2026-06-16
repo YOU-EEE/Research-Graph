@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, Edit, Link, View, Upload } from '@element-plus/icons-vue'
+import { ArrowLeft, Edit, Link, Notebook, Plus, View, Upload } from '@element-plus/icons-vue'
 import PaperForm from '../components/PaperForm.vue'
 import {
   addPaperToCollection,
@@ -15,6 +15,7 @@ import {
   updatePaper,
   uploadAttachment,
 } from '../api/papers'
+import { createNote, fetchPaperNotes } from '../api/notes'
 
 const route = useRoute()
 const router = useRouter()
@@ -31,6 +32,7 @@ const selectedCollection = ref(null)
 const previewOpen = ref(false)
 const previewAttachment = ref(null)
 const previewUrl = ref('')
+const notes = ref([])
 
 async function loadPaper() {
   loading.value = true
@@ -54,6 +56,14 @@ async function loadLookups() {
   tags.value = tagData
   venues.value = venueData
   collections.value = collectionData
+}
+
+async function loadNotes() {
+  try {
+    notes.value = await fetchPaperNotes(paperId.value)
+  } catch (error) {
+    ElMessage.error(error.userMessage)
+  }
 }
 
 async function savePaper(payload) {
@@ -113,8 +123,23 @@ function previewFile(attachment) {
   previewOpen.value = true
 }
 
+async function createPaperNote() {
+  try {
+    const note = await createNote({
+      paper_id: paperId.value,
+      title: `${paper.value?.title || 'Paper'} note`,
+      content: `## Summary\n\n## Method\n\n## Links\n\n[[${paper.value?.venue_ref?.venue_name || paper.value?.venue || 'Research Topic'}]]`,
+      note_type: 'summary',
+    })
+    ElMessage.success('Note created')
+    router.push(`/notes/${note.note_id}`)
+  } catch (error) {
+    ElMessage.error(error.userMessage)
+  }
+}
+
 onMounted(async () => {
-  await Promise.all([loadPaper(), loadLookups()])
+  await Promise.all([loadPaper(), loadLookups(), loadNotes()])
 })
 </script>
 
@@ -213,6 +238,32 @@ onMounted(async () => {
 
       <div class="detail-grid lower">
         <el-card shadow="never">
+          <template #header>
+            <div class="card-header-row">
+              <span>Reading Notes</span>
+              <el-button size="small" type="primary" :icon="Plus" @click="createPaperNote">
+                New Note
+              </el-button>
+            </div>
+          </template>
+          <div class="note-list">
+            <div
+              v-for="item in notes"
+              :key="item.note_id"
+              class="note-row"
+              @click="router.push(`/notes/${item.note_id}`)"
+            >
+              <el-icon><Notebook /></el-icon>
+              <div>
+                <strong>{{ item.title }}</strong>
+                <small>{{ item.note_type || 'summary' }}</small>
+              </div>
+            </div>
+            <span v-if="!notes.length" class="empty-text">No notes for this paper</span>
+          </div>
+        </el-card>
+
+        <el-card shadow="never">
           <template #header>Attachments</template>
           <el-upload :http-request="handleAttachment" :show-file-list="false">
             <el-button :icon="Upload">Upload PDF / file</el-button>
@@ -272,3 +323,52 @@ onMounted(async () => {
     </el-dialog>
   </section>
 </template>
+
+<style scoped>
+.card-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.note-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.note-row {
+  display: grid;
+  cursor: pointer;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #f9fafb;
+  padding: 10px;
+}
+
+.note-row:hover {
+  border-color: var(--primary);
+  background: #eff6ff;
+}
+
+.note-row strong {
+  display: block;
+  overflow: hidden;
+  color: #111827;
+  font-size: 13px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-row small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+</style>
