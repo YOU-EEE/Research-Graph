@@ -124,6 +124,7 @@ class CollectionOut(CollectionBase):
     model_config = ConfigDict(from_attributes=True)
 
     collection_id: int
+    paper_count: Optional[int] = None
 
 
 class PaperDetailOut(PaperOut):

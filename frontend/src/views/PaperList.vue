@@ -2,7 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Folder, Plus, Refresh, Search, Setting } from '@element-plus/icons-vue'
+import { Delete, Document, Files, Folder, FolderAdd, Plus, Refresh, Search, Setting } from '@element-plus/icons-vue'
 import PaperForm from '../components/PaperForm.vue'
 import {
   addPaperToCollection,
@@ -37,6 +37,7 @@ const activeCollectionId = ref(null)
 const collectionPapers = ref([])
 const selectedPaperId = ref(null)
 const collectionTreeRef = ref(null)
+const collectionDialogOpen = ref(false)
 
 const filters = reactive({
   keyword: '',
@@ -108,6 +109,20 @@ const availablePapersForCollection = computed(() => {
   return papers.value.filter((paper) => !existingIds.has(paper.paper_id))
 })
 
+const inCollectionView = computed(() => activeCollectionId.value !== null)
+
+const displayedPapers = computed(() =>
+  inCollectionView.value ? collectionPapers.value : papers.value,
+)
+
+const collectionCountMap = computed(() => {
+  const map = new Map()
+  collections.value.forEach((collection) => {
+    map.set(collection.collection_id, collection.paper_count ?? 0)
+  })
+  return map
+})
+
 async function loadLookups() {
   const [authorData, tagData, venueData, collectionData] = await Promise.all([
     fetchAuthors(),
@@ -124,9 +139,6 @@ async function loadLookups() {
   )
   if (!activeStillExists) {
     activeCollectionId.value = null
-  }
-  if (!activeCollectionId.value && collectionData.length) {
-    activeCollectionId.value = collectionData[0].collection_id
   }
 }
 
@@ -254,8 +266,9 @@ async function addCollection() {
       parent_id: metadataForm.collection_parent_id || null,
     })
     metadataForm.collection_name = ''
-    metadataForm.collection_parent_id = collection.collection_id
+    collectionDialogOpen.value = false
     activeCollectionId.value = collection.collection_id
+    metadataForm.collection_parent_id = collection.collection_id
     await loadLookups()
     await loadCollectionPapers()
     ElMessage.success('Collection saved')
@@ -270,12 +283,24 @@ function selectCollection(data) {
   loadCollectionPapers()
 }
 
-function prepareRootCollection() {
-  metadataForm.collection_parent_id = null
+function selectAllPapers() {
+  activeCollectionId.value = null
+  collectionPapers.value = []
+  if (collectionTreeRef.value) {
+    collectionTreeRef.value.setCurrentKey(null)
+  }
 }
 
-function prepareChildCollection() {
-  metadataForm.collection_parent_id = activeCollectionId.value
+function openCreateRootDialog() {
+  metadataForm.collection_name = ''
+  metadataForm.collection_parent_id = null
+  collectionDialogOpen.value = true
+}
+
+function openCreateChildDialog(parent) {
+  metadataForm.collection_name = ''
+  metadataForm.collection_parent_id = parent.collection_id
+  collectionDialogOpen.value = true
 }
 
 async function loadCollectionPapers() {
@@ -383,13 +408,103 @@ onMounted(refreshAll)
       </div>
     </el-card>
 
-    <el-table
-      v-loading="loading"
-      :data="papers"
-      class="paper-table"
-      row-key="paper_id"
-      @row-dblclick="(row) => router.push(`/papers/${row.paper_id}`)"
-    >
+    <div class="workspace">
+      <aside class="collection-sidebar">
+        <div class="sidebar-head">
+          <span class="sidebar-title">Collections</span>
+          <el-button size="small" :icon="FolderAdd" circle @click="openCreateRootDialog" />
+        </div>
+        <div
+          class="collection-all-node"
+          :class="{ active: !inCollectionView }"
+          @click="selectAllPapers"
+        >
+          <span class="collection-node-label">
+            <el-icon><Files /></el-icon>
+            <span>All Papers</span>
+          </span>
+        </div>
+        <el-tree
+          ref="collectionTreeRef"
+          :data="collectionTree"
+          node-key="collection_id"
+          default-expand-all
+          highlight-current
+          :current-node-key="activeCollectionId"
+          :expand-on-click-node="false"
+          empty-text="No collections yet"
+          @node-click="selectCollection"
+        >
+          <template #default="{ data }">
+            <div class="collection-tree-node">
+              <span class="collection-node-label">
+                <el-icon><Folder /></el-icon>
+                <span>{{ data.collection_name }}</span>
+                <el-tag size="small" effect="plain" round class="count-badge">
+                  {{ collectionCountMap.get(data.collection_id) ?? 0 }}
+                </el-tag>
+              </span>
+              <span class="node-actions">
+                <el-button
+                  size="small"
+                  :icon="FolderAdd"
+                  link
+                  title="New child"
+                  @click.stop="openCreateChildDialog(data)"
+                />
+                <el-button
+                  size="small"
+                  type="danger"
+                  :icon="Delete"
+                  link
+                  title="Delete"
+                  @click.stop="confirmDeleteCollection(data)"
+                />
+              </span>
+            </div>
+          </template>
+        </el-tree>
+      </aside>
+
+      <div class="workspace-main">
+        <div class="collection-context-bar">
+          <div class="context-info">
+            <h2>{{ inCollectionView ? activeCollection?.collection_name : 'All Papers' }}</h2>
+            <span class="context-count">{{ displayedPapers.length }} papers</span>
+          </div>
+          <div v-if="inCollectionView" class="collection-add-paper">
+            <el-select
+              v-model="selectedPaperId"
+              clearable
+              filterable
+              size="small"
+              placeholder="Add a paper to this collection"
+            >
+              <el-option
+                v-for="paper in availablePapersForCollection"
+                :key="paper.paper_id"
+                :label="paper.title"
+                :value="paper.paper_id"
+              />
+            </el-select>
+            <el-button
+              type="primary"
+              size="small"
+              :disabled="!selectedPaperId"
+              @click="addSelectedPaperToCollection"
+            >
+              Add
+            </el-button>
+          </div>
+        </div>
+
+        <el-table
+          v-loading="loading"
+          :data="displayedPapers"
+          class="paper-table"
+          row-key="paper_id"
+          @row-dblclick="(row) => router.push(`/papers/${row.paper_id}`)"
+        >
       <el-table-column label="Title" min-width="320">
         <template #default="{ row }">
           <div class="paper-title" @click="router.push(`/papers/${row.paper_id}`)">
@@ -426,13 +541,23 @@ onMounted(refreshAll)
           <el-tag effect="plain">{{ row.reading_status }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="Actions" width="170" fixed="right">
+      <el-table-column label="Actions" width="240" fixed="right">
         <template #default="{ row }">
           <el-button size="small" @click="router.push(`/papers/${row.paper_id}`)">Open</el-button>
+          <el-button
+            v-if="inCollectionView"
+            size="small"
+            plain
+            @click="removeFromActiveCollection(row)"
+          >
+            Remove
+          </el-button>
           <el-button size="small" type="danger" plain @click="confirmDelete(row)">Delete</el-button>
         </template>
       </el-table-column>
     </el-table>
+      </div>
+    </div>
 
     <el-dialog v-model="dialogOpen" title="New Paper" width="760px">
       <PaperForm
@@ -495,120 +620,33 @@ onMounted(refreshAll)
             </el-table-column>
           </el-table>
         </el-card>
-
-        <el-card shadow="never" class="full-span">
-          <template #header>Collection Directories</template>
-          <div class="collection-create-row">
-            <el-input v-model="metadataForm.collection_name" placeholder="New directory name" />
-            <el-select v-model="metadataForm.collection_parent_id" clearable placeholder="Parent">
-              <el-option
-                v-for="collection in collectionParentOptions"
-                :key="collection.collection_id ?? 'root'"
-                :label="collection.collection_name"
-                :value="collection.collection_id"
-              />
-            </el-select>
-            <el-button type="primary" @click="addCollection">Create</el-button>
-          </div>
-
-          <div class="collection-manager">
-            <div class="collection-list-panel">
-              <div class="tree-toolbar">
-                <el-button size="small" @click="prepareRootCollection">New Root</el-button>
-                <el-button size="small" :disabled="!activeCollectionId" @click="prepareChildCollection">
-                  New Child
-                </el-button>
-              </div>
-              <el-tree
-                ref="collectionTreeRef"
-                :data="collectionTree"
-                node-key="collection_id"
-                default-expand-all
-                highlight-current
-                :current-node-key="activeCollectionId"
-                empty-text="No collection directories"
-                @node-click="selectCollection"
-              >
-                <template #default="{ data }">
-                  <div class="collection-tree-node">
-                    <span class="collection-node-label">
-                      <el-icon><Folder /></el-icon>
-                      <span>{{ data.collection_name }}</span>
-                    </span>
-                    <el-button
-                      size="small"
-                      type="danger"
-                      link
-                      @click.stop="confirmDeleteCollection(data)"
-                    >
-                      Delete
-                    </el-button>
-                  </div>
-                </template>
-              </el-tree>
-              <div v-if="!collections.length" class="empty-text">No collections yet</div>
-            </div>
-
-            <div class="collection-detail-panel">
-              <div class="collection-detail-heading">
-                <div>
-                  <h2>{{ activeCollection?.collection_name || 'No directory selected' }}</h2>
-                  <p>
-                    {{
-                      activeCollection
-                        ? 'Papers assigned to this directory'
-                        : 'Select or create a directory to manage papers'
-                    }}
-                  </p>
-                </div>
-              </div>
-              <div class="collection-add-paper">
-                <el-select
-                  v-model="selectedPaperId"
-                  clearable
-                  filterable
-                  placeholder="Choose a paper to add"
-                >
-                  <el-option
-                    v-for="paper in availablePapersForCollection"
-                    :key="paper.paper_id"
-                    :label="paper.title"
-                    :value="paper.paper_id"
-                  />
-                </el-select>
-                <el-button
-                  type="primary"
-                  :disabled="!activeCollectionId || !selectedPaperId"
-                  @click="addSelectedPaperToCollection"
-                >
-                  Add Paper
-                </el-button>
-              </div>
-
-              <el-table :data="collectionPapers" size="small" max-height="280" class="nested-table">
-                <el-table-column label="Paper">
-                  <template #default="{ row }">
-                    <div class="paper-title" @click="router.push(`/papers/${row.paper_id}`)">
-                      {{ row.title }}
-                    </div>
-                    <div class="paper-subline">
-                      {{ row.authors?.map((author) => author.author_name).join(', ') || 'No authors' }}
-                    </div>
-                  </template>
-                </el-table-column>
-                <el-table-column prop="year" label="Year" width="80" />
-                <el-table-column label="Actions" width="110">
-                  <template #default="{ row }">
-                    <el-button size="small" type="danger" plain @click="removeFromActiveCollection(row)">
-                      Remove
-                    </el-button>
-                  </template>
-                </el-table-column>
-              </el-table>
-            </div>
-          </div>
-        </el-card>
       </div>
+    </el-dialog>
+
+    <el-dialog v-model="collectionDialogOpen" title="New Collection" width="460px">
+      <el-form label-position="top">
+        <el-form-item label="Name">
+          <el-input
+            v-model="metadataForm.collection_name"
+            placeholder="Collection name"
+            @keyup.enter="addCollection"
+          />
+        </el-form-item>
+        <el-form-item label="Parent directory">
+          <el-select v-model="metadataForm.collection_parent_id" clearable placeholder="Root directory">
+            <el-option
+              v-for="collection in collectionParentOptions"
+              :key="collection.collection_id ?? 'root'"
+              :label="collection.collection_name"
+              :value="collection.collection_id"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="collectionDialogOpen = false">Cancel</el-button>
+        <el-button type="primary" @click="addCollection">Create</el-button>
+      </template>
     </el-dialog>
   </section>
 </template>

@@ -476,7 +476,13 @@ def delete_venue(venue_id: int, db: Session = Depends(get_db)):
 
 @collections_router.get("/", response_model=list[CollectionOut])
 def list_collections(db: Session = Depends(get_db)):
-    return db.query(Collection).order_by(Collection.collection_name).all()
+    collections = db.query(Collection).order_by(Collection.collection_name).all()
+    result = []
+    for collection in collections:
+        data = CollectionOut.model_validate(collection)
+        data.paper_count = len(collection.papers)
+        result.append(data)
+    return result
 
 
 @collections_router.post("/", response_model=CollectionOut)
