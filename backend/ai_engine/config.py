@@ -48,6 +48,8 @@ OPENAI_API_KEY = _get("OPENAI_API_KEY")
 OPENAI_BASE_URL = _get("OPENAI_BASE_URL", "https://api.openai.com/v1")
 CHAT_MODEL = _get("CHAT_MODEL", "gpt-4o-mini")
 EMBED_MODEL = _get("EMBED_MODEL", "text-embedding-3-small")
+# 部分云端 embedding 端点（如阿里云 DashScope）限制单次请求条数，需分批调用
+EMBED_BATCH_SIZE = int(_get("EMBED_BATCH_SIZE", "10"))
 
 # ---- 分析参数 ----
 # 嵌入模型（sentence-transformers / OpenAI）语义相似度阈值

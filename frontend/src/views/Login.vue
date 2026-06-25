@@ -38,8 +38,10 @@ if (saved) {
     <div class="login-card">
       <div class="brand">
         <div class="brand-mark">RG</div>
-        <div class="brand-title">ResearchGraph</div>
-        <div class="brand-subtitle">科研协作与知识图谱系统</div>
+        <div class="brand-text">
+          <div class="brand-title">ResearchGraph</div>
+          <div class="brand-subtitle">科研协作与知识图谱系统</div>
+        </div>
       </div>
       <el-form @submit.prevent="handleSubmit" label-position="top">
         <el-form-item label="用户名">
@@ -75,7 +77,11 @@ if (saved) {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
 }
 .brand {
-  text-align: center;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
   margin-bottom: 32px;
 }
 .brand-mark {
@@ -89,7 +95,10 @@ if (saved) {
   color: #fff;
   font-size: 24px;
   font-weight: 700;
-  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+.brand-text {
+  text-align: left;
 }
 .brand-title {
   font-size: 22px;

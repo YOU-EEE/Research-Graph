@@ -264,6 +264,7 @@ class PaperEmbedding(Base):
     vector = Column(LargeBinary, nullable=False)
     dim = Column(Integer, nullable=False)
     model = Column(String)
+    text_hash = Column(String)   # 论文文本的哈希，用于判断缓存是否过期
     computed_at = Column(DateTime, server_default=func.now())
 
 

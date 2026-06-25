@@ -11,6 +11,7 @@
 """
 from __future__ import annotations
 
+import hashlib
 import struct
 
 import numpy as np
@@ -35,6 +36,10 @@ from models import (
 # ----------------- 通用工具 -----------------
 def _vector_to_blob(vec: list[float]) -> bytes:
     return struct.pack(f"<{len(vec)}f", *vec)
+
+
+def _text_hash(text: str) -> str:
+    return hashlib.sha1((text or "").encode("utf-8")).hexdigest()
 
 
 def _make_provider(mode: str | None):
@@ -76,26 +81,56 @@ def _corpus(db: Session, provider):
     if len(inputs) < 2:
         raise HTTPException(status_code=400, detail="论文数不足（至少需要 2 篇）以计算相似度/聚类")
 
-    vectors = provider.embed([p.text for p in inputs])
-    arr = np.asarray(vectors, dtype=np.float32)
-    dim = int(arr.shape[1])
-
     is_tfidf = provider.model_name == "local:tfidf"
     method = "tfidf_cosine" if is_tfidf else "embedding_cosine"
     provider.similarity_threshold = (
         ai_config.TFIDF_SIMILARITY_THRESHOLD if is_tfidf else ai_config.SIMILARITY_THRESHOLD
     )
+    model = provider.model_name
+    hashes = [_text_hash(p.text) for p in inputs]
 
-    # 缓存向量（覆盖式 upsert）
-    for i, p in enumerate(inputs):
-        blob = _vector_to_blob(arr[i].tolist())
+    if is_tfidf:
+        # TF-IDF 是语料相关的，向量随整库变化，必须一次性整库重算（无法按篇缓存）
+        vectors = provider.embed([p.text for p in inputs])
+        arr = np.asarray(vectors, dtype=np.float32)
+        dim = int(arr.shape[1])
+        for i, p in enumerate(inputs):
+            blob = _vector_to_blob(arr[i].tolist())
+            row = db.get(PaperEmbedding, p.id)
+            if row is None:
+                db.add(PaperEmbedding(paper_id=p.id, vector=blob, dim=dim,
+                                      model=model, text_hash=hashes[i]))
+            else:
+                row.vector, row.dim, row.model, row.text_hash = blob, dim, model, hashes[i]
+        db.commit()
+        return inputs, arr, method
+
+    # 云端 / 句向量：每篇向量相互独立，可按篇缓存复用。
+    # 仅对「无缓存 / 模型不同 / 文本已变」的论文重新 embedding。
+    cached: dict[int, np.ndarray] = {}
+    for p, h in zip(inputs, hashes):
         row = db.get(PaperEmbedding, p.id)
-        if row is None:
-            db.add(PaperEmbedding(paper_id=p.id, vector=blob, dim=dim,
-                                  model=provider.model_name))
-        else:
-            row.vector, row.dim, row.model = blob, dim, provider.model_name
-    db.commit()
+        if row is not None and row.model == model and row.text_hash == h:
+            cached[p.id] = np.frombuffer(row.vector, dtype=np.float32)
+
+    missing = [(i, p) for i, p in enumerate(inputs) if p.id not in cached]
+    if missing:
+        new_vectors = provider.embed([p.text for _, p in missing])
+        for (i, p), vec in zip(missing, new_vectors):
+            v = np.asarray(vec, dtype=np.float32)
+            cached[p.id] = v
+            blob = _vector_to_blob(v.tolist())
+            row = db.get(PaperEmbedding, p.id)
+            if row is None:
+                db.add(PaperEmbedding(paper_id=p.id, vector=blob, dim=int(v.shape[0]),
+                                      model=model, text_hash=hashes[i]))
+            else:
+                row.vector, row.dim, row.model, row.text_hash = (
+                    blob, int(v.shape[0]), model, hashes[i]
+                )
+        db.commit()
+
+    arr = np.asarray([cached[p.id] for p in inputs], dtype=np.float32)
     return inputs, arr, method
 
 
@@ -253,7 +288,7 @@ def generate_relation_suggestions(db: Session, paper_id: int, mode: str | None):
     paper = _require_paper(db, paper_id)
     provider = _make_provider(mode)
     inputs, arr, method = _corpus(db, provider)
-
+    print("+++++++ corpus complete ++++++++")
     id_to_idx = {p.id: i for i, p in enumerate(inputs)}
     i = id_to_idx[paper_id]
     sim_row = _cosine_matrix(arr)[i]
@@ -273,8 +308,9 @@ def generate_relation_suggestions(db: Session, paper_id: int, mode: str | None):
             break
 
     src_input = inputs[i]
+    print("+++++++ relations before ++++++++")
     rels = provider.suggest_relations(src_input, candidates, similarities) if candidates else []
-
+    print("+++++++ relations complete ++++++++")
     # 覆盖式：删该源论文未被接受的旧关系建议
     db.query(AIRelationSuggestion).filter(
         AIRelationSuggestion.source_paper_id == paper_id,

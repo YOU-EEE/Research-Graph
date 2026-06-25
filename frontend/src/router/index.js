@@ -12,6 +12,7 @@ import NoteList from '../views/NoteList.vue'
 import NoteEditor from '../views/NoteEditor.vue'
 import ConceptList from '../views/ConceptList.vue'
 import ConceptDetail from '../views/ConceptDetail.vue'
+import AIAnalysis from '../views/AIAnalysis.vue'
 
 const routes = [
   { path: '/login', name: 'login', component: Login, meta: { noAuth: true } },
@@ -27,6 +28,7 @@ const routes = [
   { path: '/notes/:id', name: 'note-editor', component: NoteEditor, props: true },
   { path: '/concepts', name: 'concepts', component: ConceptList },
   { path: '/concepts/:id', name: 'concept-detail', component: ConceptDetail, props: true },
+  { path: '/ai', name: 'ai', component: AIAnalysis },
   { path: '/', redirect: '/dashboard' },
 ]
 

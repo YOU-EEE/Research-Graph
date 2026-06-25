@@ -3,7 +3,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { computed } from 'vue'
 import {
   Document, Notebook, UploadFilled, FolderOpened,
-  List, Connection, SwitchButton, HomeFilled, CollectionTag,
+  List, Connection, SwitchButton, HomeFilled, CollectionTag, MagicStick,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -55,6 +55,10 @@ function handleLogout() {
           <el-icon><CollectionTag /></el-icon>
           <span>概念卡片</span>
         </el-menu-item>
+        <el-menu-item index="/ai">
+          <el-icon><MagicStick /></el-icon>
+          <span>AI 分析</span>
+        </el-menu-item>
         <el-menu-item index="/projects">
           <el-icon><FolderOpened /></el-icon>
           <span>科研项目</span>
@@ -82,7 +86,6 @@ function handleLogout() {
         <div>
           <div class="topbar-title">{{ route.meta.title || 'ResearchGraph' }}</div>
         </div>
-        <el-tag effect="plain">Module D: 协作与知识图谱</el-tag>
       </el-header>
 
       <el-main class="main-content">
@@ -101,7 +104,8 @@ body {
 
 /* 侧边栏 */
 .app-shell {
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 .sidebar {
   background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
@@ -182,7 +186,8 @@ body {
 /* 主内容区 */
 .main-content {
   background: #f5f7fa;
-  min-height: calc(100vh - 56px);
+  height: calc(100vh - 56px);
+  overflow-y: auto;
   padding: 20px 24px;
 }
 

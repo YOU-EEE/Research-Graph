@@ -72,8 +72,18 @@ class CloudProvider(AIProvider):
 
     # ---------------- 嵌入 ----------------
     def embed(self, texts: list[str]) -> list[list[float]]:
-        resp = self._client.embeddings.create(model=config.EMBED_MODEL, input=texts)
-        return [_norm(list(d.embedding)) for d in resp.data]
+        # 部分端点限制单批条数（如 DashScope ≤ 10），按 EMBED_BATCH_SIZE 分批后再拼接
+        batch_size = max(1, config.EMBED_BATCH_SIZE)
+        out: list[list[float]] = []
+        for start in range(0, len(texts), batch_size):
+            chunk = texts[start:start + batch_size]
+            resp = self._client.embeddings.create(
+                model=config.EMBED_MODEL, input=chunk
+            )
+            # 按 index 排序，确保返回顺序与输入一致
+            ordered = sorted(resp.data, key=lambda d: d.index)
+            out.extend(_norm(list(d.embedding)) for d in ordered)
+        return out
 
     # ---------------- 标签 ----------------
     def suggest_tags(self, paper: PaperInput, max_tags: int) -> list[TagSuggestion]:
