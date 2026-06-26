@@ -5,6 +5,8 @@ __pycache__/
 
 # Backend local data
 backend/research_graph.db
+backend/research_graph.db-shm
+backend/research_graph.db-wal
 backend/storage/
 backend/.env
 backend/scripts/seed_ai_demo.py
